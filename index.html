@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>포켓몬스터 - 레트로 배틀 어드벤처</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts for Retro Aesthetic -->
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    canvas, img { image-rendering: pixelated; }
+    .game-border {
+      border: 4px solid #334155;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    @keyframes shinyGlow {
+      0% { filter: drop-shadow(0 0 2px #fbbf24); }
+      50% { filter: drop-shadow(0 0 10px #f59e0b) brightness(1.2); }
+      100% { filter: drop-shadow(0 0 2px #fbbf24); }
+    }
+    .shiny-effect { animation: shinyGlow 1.5s infinite; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-2 sm:p-4">
+
+  <!-- Login Modal Screen -->
+  <div id="screen-login" class="fixed inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border-2 border-slate-700 rounded-2xl w-full max-w-md p-6 flex flex-col gap-5 shadow-2xl">
+      <div class="text-center">
+        <i class="fa-solid fa-compact-disc text-red-500 text-3xl animate-spin mb-2" style="animation-duration: 8s;"></i>
+        <h2 class="text-xl font-black text-amber-400">포켓몬 트레이너 로그인</h2>
+        <p class="text-xs text-slate-400 mt-1">아이디를 입력하여 모험을 시작하거나 이어서 하세요.</p>
+      </div>
+
+      <div class="flex flex-col gap-3">
+        <div>
+          <label class="text-xs font-bold text-slate-300 mb-1 block">트레이너 ID (이름)</label>
+          <input type="text" id="login-username" placeholder="예: 지우" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-amber-400">
+        </div>
+        <button onclick="handleLogin()" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl shadow transition text-sm flex items-center justify-center gap-2">
+          <i class="fa-solid fa-right-to-bracket"></i> 모험 시작하기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Game Container -->
+  <div class="w-full max-w-4xl bg-slate-950 rounded-2xl game-border overflow-hidden flex flex-col relative">
+    
+    <!-- Top Bar Navigation / Game Header -->
+    <header class="bg-slate-900 px-4 py-3 border-b border-slate-800 flex flex-wrap justify-between items-center gap-2">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-user-shield text-cyan-400 text-lg"></i>
+        <span id="header-username" class="font-bold text-sm text-cyan-300">트레이너</span>
+      </div>
+      
+      <div id="header-stats" class="flex items-center space-x-3 text-xs sm:text-sm bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800">
+        <span class="flex items-center gap-1 text-cyan-300 font-bold"><i class="fa-solid fa-map-location-dot"></i> <span id="header-area-name">태초마을</span></span>
+        <span class="flex items-center gap-1 text-amber-300 font-bold"><i class="fa-solid fa-coins"></i> <span id="gold-val">1000</span>G</span>
+        <span class="flex items-center gap-1 text-red-400 font-bold"><i class="fa-solid fa-bullseye"></i> <span id="balls-val">10</span>개</span>
+        <span class="flex items-center gap-1 text-purple-400 font-bold"><i class="fa-solid fa-shield"></i> <span id="badge-val">0</span>개</span>
+      </div>
+    </header>
+
+    <!-- Main Game Viewport -->
+    <main class="relative w-full aspect-[4/3] sm:aspect-[16/10] bg-slate-900 overflow-hidden flex flex-col">
+      <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+      <!-- Intro / Starter Select Screen -->
+      <div id="screen-starter" class="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-6 z-20 hidden">
+        <h2 class="text-2xl sm:text-3xl font-black text-amber-400 mb-2 text-center">파트너 포켓몬을 선택하세요!</h2>
+        <p class="text-slate-400 text-sm mb-6 text-center">오키드 박사가 모험을 함께할 첫 포켓몬을 선물합니다.</p>
+        
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-2xl">
+          <div onclick="selectStarter('이상해씨')" class="bg-slate-900 hover:bg-slate-800 border-2 border-emerald-500/50 rounded-xl p-4 flex flex-col items-center cursor-pointer transition transform hover:-translate-y-1">
+            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png" class="w-24 h-24 object-contain" alt="이상해씨">
+            <span class="font-bold text-emerald-400 mt-2">이상해씨</span>
+          </div>
+          <div onclick="selectStarter('파이리')" class="bg-slate-900 hover:bg-slate-800 border-2 border-orange-500/50 rounded-xl p-4 flex flex-col items-center cursor-pointer transition transform hover:-translate-y-1">
+            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png" class="w-24 h-24 object-contain" alt="파이리">
+            <span class="font-bold text-orange-400 mt-2">파이리</span>
+          </div>
+          <div onclick="selectStarter('꼬북이')" class="bg-slate-900 hover:bg-slate-800 border-2 border-blue-500/50 rounded-xl p-4 flex flex-col items-center cursor-pointer transition transform hover:-translate-y-1">
+            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png" class="w-24 h-24 object-contain" alt="꼬북이">
+            <span class="font-bold text-blue-400 mt-2">꼬북이</span>
+          </div>
+          <div onclick="selectStarter('피카츄')" class="bg-slate-900 hover:bg-slate-800 border-2 border-amber-500/50 rounded-xl p-4 flex flex-col items-center cursor-pointer transition transform hover:-translate-y-1">
+            <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png" class="w-24 h-24 object-contain" alt="피카츄">
+            <span class="font-bold text-amber-400 mt-2">피카츄</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dialogue Overlay Box -->
+      <div id="battle-dialogue" class="absolute bottom-3 left-3 right-3 bg-slate-900/95 border border-slate-700 rounded-xl p-4 min-h-[70px] flex items-center justify-between z-10 transition-opacity duration-200 opacity-0 pointer-events-none">
+        <p id="dialogue-text" class="text-sm sm:text-base text-slate-100 font-medium leading-relaxed"></p>
+      </div>
+    </main>
+
+    <!-- Bottom Controls -->
+    <footer class="bg-slate-900 p-3 border-t border-slate-800 flex flex-col gap-3">
+      <!-- Battle Controls -->
+      <div id="battle-controls" class="grid grid-cols-2 sm:grid-cols-4 gap-2 hidden">
+        <button onclick="openMoveMenu()" class="bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-2 rounded-xl shadow flex items-center justify-center gap-2 text-sm"><i class="fa-solid fa-burst"></i> 공격하기</button>
+        <button onclick="openBagMenu()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-2 rounded-xl shadow flex items-center justify-center gap-2 text-sm"><i class="fa-solid fa-briefcase"></i> 가방</button>
+        <button onclick="openPartyMenu(true)" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-2 rounded-xl shadow flex items-center justify-center gap-2 text-sm"><i class="fa-solid fa-users"></i> 교체</button>
+        <button onclick="attemptRun()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-2 rounded-xl shadow flex items-center justify-center gap-2 text-sm"><i class="fa-solid fa-person-running"></i> 도망치기</button>
+      </div>
+
+      <div id="move-controls" class="grid grid-cols-2 gap-2 hidden"></div>
+
+      <!-- Hub Controls -->
+      <div id="hub-controls" class="flex flex-wrap justify-center gap-2">
+        <button onclick="exploreGrass()" class="flex-1 min-w-[105px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-3 rounded-xl shadow flex items-center justify-center gap-1.5 text-sm"><i class="fa-solid fa-tree"></i> 탐색</button>
+        <button onclick="openAreaModal()" class="flex-1 min-w-[105px] bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-3 rounded-xl shadow flex items-center justify-center gap-1.5 text-sm"><i class="fa-solid fa-map"></i> 지역이동</button>
+        <button onclick="challengeGym()" class="flex-1 min-w-[105px] bg-purple-600 hover:bg-purple-500 text-white font-bold py-2.5 px-3 rounded-xl shadow flex items-center justify-center gap-1.5 text-sm"><i class="fa-solid fa-landmark"></i> 체육관</button>
+        <button onclick="visitCenter()" class="flex-1 min-w-[85px] bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 px-2 rounded-xl shadow flex items-center justify-center gap-1 text-sm"><i class="fa-solid fa-house-medical"></i> 센터</button>
+        <button onclick="visitShop()" class="flex-1 min-w-[75px] bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-2 rounded-xl shadow flex items-center justify-center gap-1 text-sm"><i class="fa-solid fa-store"></i> 숍</button>
+        <button onclick="openPartyMenu(false)" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-3 rounded-xl border border-slate-700 text-sm" title="파티"><i class="fa-solid fa-layer-group"></i></button>
+        <button onclick="openPokedex()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 px-3 rounded-xl border border-slate-700 text-sm" title="도감"><i class="fa-solid fa-book"></i></button>
+        <button onclick="saveGamePrompt()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 px-3 rounded-xl border border-slate-700 text-sm" title="저장"><i class="fa-solid fa-floppy-disk"></i></button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Modals -->
+  <div id="modal-party" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-5 flex flex-col gap-4 max-h-[90vh]">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-lg font-bold text-emerald-400 flex items-center gap-2"><i class="fa-solid fa-users"></i> 내 포켓몬 파티 (<span id="party-count">0</span>/6)</h3>
+        <button onclick="closeModal('modal-party')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <div id="party-list" class="flex flex-col gap-2 overflow-y-auto pr-1 my-2 min-h-[200px]"></div>
+    </div>
+  </div>
+
+  <div id="modal-area" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-5 flex flex-col gap-4 max-h-[90vh]">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-lg font-bold text-indigo-400 flex items-center gap-2"><i class="fa-solid fa-map-location-dot"></i> 지역 이동 선택 (총 10개 지역)</h3>
+        <button onclick="closeModal('modal-area')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <div id="area-list" class="flex flex-col gap-3 overflow-y-auto max-h-[60vh] pr-1"></div>
+    </div>
+  </div>
+
+  <div id="modal-pokedex" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl p-5 flex flex-col gap-4 max-h-[90vh]">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-lg font-bold text-red-400 flex items-center gap-2"><i class="fa-solid fa-book-bookmark"></i> 포켓몬 도감 (151마리)</h3>
+        <button onclick="closeModal('modal-pokedex')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <div id="pokedex-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 overflow-y-auto p-1 max-h-[60vh]"></div>
+    </div>
+  </div>
+
+  <div id="modal-shop" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-5 flex flex-col gap-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-lg font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-store"></i> 프렌들리숍</h3>
+        <button onclick="closeModal('modal-shop')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <div id="shop-items" class="flex flex-col gap-3"></div>
+    </div>
+  </div>
+
+  <div id="modal-bag" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-5 flex flex-col gap-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-lg font-bold text-amber-400 flex items-center gap-2"><i class="fa-solid fa-briefcase"></i> 아이템 가방</h3>
+        <button onclick="closeModal('modal-bag')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <div id="bag-items-list" class="flex flex-col gap-2 max-h-[50vh] overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <script>
+    const MOVES_DB = {
+      '몸통박치기': { name: '몸통박치기', type: '노말', power: 30 },
+      '할퀴기': { name: '할퀴기', type: '노말', power: 30 },
+      '불꽃세례': { name: '불꽃세례', type: '불꽃', power: 35 },
+      '화염방사': { name: '화염방사', type: '불꽃', power: 75 },
+      '물대포': { name: '물대포', type: '물', power: 35 },
+      '하이드로펌프': { name: '하이드로펌프', type: '물', power: 85 },
+      '덩굴채찍': { name: '덩굴채찍', type: '풀', power: 35 },
+      '솔라빔': { name: '솔라빔', type: '풀', power: 80 },
+      '전기쇼크': { name: '전기쇼크', type: '전기', power: 35 },
+      '백만볼트': { name: '백만볼트', type: '전기', power: 75 },
+      '전광석화': { name: '전광석화', type: '노말', power: 30 },
+      '바람일으키기': { name: '바람일으키기', type: '비행', power: 30 },
+      '지진': { name: '지진', type: '땅', power: 70 },
+      '사이코키네시스': { name: '사이코키네시스', type: '초능력', power: 75 },
+      '섀도볼': { name: '섀도볼', type: '고스트', power: 75 }
+    };
+
+    const KANTO_NAMES = [
+      "이상해씨", "이상해풀", "이상해꽃", "파이리", "리자드", "리자몽", "꼬부기", "어니부기", "거북왕", "캐터피",
+      "단풀이", "버터플", "뿔충이", "딱충이", "독침붕", "구구", "피죤", "피죤투", "꼬렛", "레트라",
+      "깨비참", "깨비드릴조", "아보", "아보크", "피카츄", "라이츄", "모래두지", "모래상지", "니드런♀", "니드리나",
+      "니드퀸", "니드런♂", "니드리노", "니드왕", "삐삐", "픽시", "식스테일", "나인테일", "푸린", "푸크린",
+      "주뱃", "골뱃", "뚜벅초", "냄새꼬", "라플레시아", "파라스", "파라섹트", "콘팡", "도나리", "디그다",
+      "닥트리오", "나옹", "페르시온", "고라파덕", "골덕", "망키", "성원숭", "가디", "윈디", "발챙이",
+      "슈륙챙이", "강챙이", "캐이시", "윤겔라", "후딘", "알통몬", "근육몬", "괴력몬", "모다피", "우츠동",
+      "우츠보트", "왕눈해", "독파리", "꼬마돌", "데구리", "딱구리", "포니타", "날쌩마", "야돈", "야도란",
+      "코일", "레어코일", "파오리", "두두", "두트리오", "쥬쥬", "쥬레곤", "진흙토이", "질뻐기", "셀러",
+      "파르셀", "고오스", "고우스트", "팬텀", "롱스톤", "슬리프", "슬리퍼", "크랩", "킹크랩", "찌리리공",
+      "붐볼", "아라리", "나시", "탕구리", "텅구리", "시라소몬", "홍수몬", "내루미", "또가스", "또도가스",
+      "뿔카노", "코뿌리", "럭키", "덩쿠리", "캥카", "쏘드라", "시드라", "콘치", "왕콘치", "별가사리",
+      "아쿠스타", "마임맨", "스라크", "루주라", "에레브", "마그마", "쁘사이저", "켄타로스", "잉어킹", "갸라도스",
+      "라프라스", "메타몽", "이브이", "샤미드", "쥬피썬더", "부스터", "폴리곤", "암나이트", "암스타", "투구푸스",
+      "투구", "프테라", "잠만보", "프리져", "썬더", "파이어", "미니룡", "신뇽", "망나뇽", "뮤츠", "뮤"
+    ];
+
+    const POKEMON_DB = KANTO_NAMES.map((name, index) => {
+      const id = index + 1;
+      let type = "노말";
+      if (["이상해씨", "이상해풀", "이상해꽃", "뚜벅초", "냄새꼬", "라플레시아", "파라스", "파라섹트", "모다피", "우츠동", "우츠보트", "덩쿠리"].includes(name)) type = "풀";
+      else if (["파이리", "리자드", "리자몽", "식스테일", "나인테일", "가디", "윈디", "마그마", "파이어"].includes(name)) type = "불꽃";
+      else if (["꼬부기", "어니부기", "거북왕", "발챙이", "슈륙챙이", "강챙이", "왕눈해", "독파리", "야돈", "야도란", "쥬쥬", "쥬레곤", "셀러", "파르셀", "콘치", "왕콘치", "별가사리", "아쿠스타", "쏘드라", "시드라", "잉어킹", "갸라도스", "라프라스", "샤미드", "암나이트", "암스타", "투구", "투구푸스"].includes(name)) type = "물";
+      else if (["피카츄", "라이츄", "코일", "레어코일", "찌리리공", "붐볼", "에레브", "썬더"].includes(name)) type = "전기";
+      else if (["고오스", "고우스트", "팬텀"].includes(name)) type = "고스트";
+      else if (["뮤츠", "뮤", "캐이시", "윤겔라", "후딘", "슬리프", "슬리퍼"].includes(name)) type = "초능력";
+
+      return {
+        id: id,
+        name: name,
+        type: type,
+        hp: 30 + (id % 25),
+        atk: 30 + (id % 20),
+        def: 25 + (id % 20),
+        expYield: 40 + (id % 40),
+        moves: ['몸통박치기', type === '불꽃' ? '불꽃세례' : type === '물' ? '물대포' : type === '풀' ? '덩굴채찍' : type === '전기' ? '전기쇼크' : type === '초능력' ? '사이코키네시스' : type === '고스트' ? '섀도볼' : '전광석화']
+      };
+    });
+
+    const REGIONS = [
+      { id: 0, name: "1. 태초마을", minLevel: 2, maxLevel: 5, wildIds: [1, 4, 7, 10, 13, 16, 19], gymLeader: { name: "웅이 (회색체육관)", badgeName: "회색 뱃지", pokemon: { name: "롱스톤", id: 95, level: 6, hp: 60, maxHp: 60, atk: 25, def: 50, moves: ['몸통박치기', '지진'] } } },
+      { id: 1, name: "2. 상록숲", minLevel: 5, maxLevel: 9, wildIds: [10, 11, 12, 13, 14, 15, 25], gymLeader: { name: "이슬이 (블루체육관)", badgeName: "블루 뱃지", pokemon: { name: "아쿠스타", id: 121, level: 10, hp: 80, maxHp: 80, atk: 35, def: 35, moves: ['물대포', '사이코키네시스'] } } },
+      { id: 2, name: "3. 블루시티 호수", minLevel: 9, maxLevel: 14, wildIds: [7, 8, 54, 55, 60, 61, 72, 73, 129], gymLeader: { name: "마티스 (갈색체육관)", badgeName: "오렌지 뱃지", pokemon: { name: "라이츄", id: 26, level: 15, hp: 110, maxHp: 110, atk: 48, def: 40, moves: ['전기쇼크', '백만볼트'] } } },
+      { id: 3, name: "4. 달맞이산 동굴", minLevel: 13, maxLevel: 19, wildIds: [35, 36, 41, 42, 74, 75, 92, 93], gymLeader: { name: "민지 (무쇠체육관)", badgeName: "레인보우 뱃지", pokemon: { name: "팬텀", id: 94, level: 20, hp: 130, maxHp: 130, atk: 55, def: 45, moves: ['섀도볼', '사이코키네시스'] } } },
+      { id: 4, name: "5. 무지개시티 초원", minLevel: 18, maxLevel: 25, wildIds: [43, 44, 45, 48, 52, 69, 70, 71, 133], gymLeader: { name: "독립군 (독극체육관)", badgeName: "소울 뱃지", pokemon: { name: "나인테일", id: 38, level: 26, hp: 160, maxHp: 160, atk: 62, def: 52, moves: ['화염방사', '몸통박치기'] } } },
+      { id: 5, name: "6. 보라타운 유령의탑", minLevel: 24, maxLevel: 32, wildIds: [92, 93, 94, 95, 104, 105], gymLeader: { name: "초능력자 나나", badgeName: "마쉬 뱃지", pokemon: { name: "후딘", id: 65, level: 33, hp: 180, maxHp: 180, atk: 70, def: 55, moves: ['사이코키네시스', '백만볼트'] } } },
+      { id: 6, name: "7. 연분홍시티 사파리", minLevel: 30, maxLevel: 38, wildIds: [32, 33, 34, 111, 112, 115, 123, 127, 143], gymLeader: { name: "강철의 사나이", badgeName: "볼케이노 뱃지", pokemon: { name: "코뿌리", id: 112, level: 39, hp: 210, maxHp: 210, atk: 78, def: 70, moves: ['지진', '몸통박치기'] } } },
+      { id: 7, name: "8. 홍도섬 화산지대", minLevel: 36, maxLevel: 45, wildIds: [4, 5, 6, 37, 38, 58, 59, 126, 146], gymLeader: { name: "화산의 지배자", badgeName: "어스 뱃지", pokemon: { name: "리자몽", id: 6, level: 46, hp: 250, maxHp: 250, atk: 90, def: 75, moves: ['화염방사', '하이드로펌프'] } } },
+      { id: 8, name: "9. 챔피언로드", minLevel: 43, maxLevel: 53, wildIds: [130, 131, 142, 147, 148, 149], gymLeader: { name: "사천왕 목호", badgeName: "챔피언 뱃지", pokemon: { name: "망나뇽", id: 149, level: 54, hp: 300, maxHp: 300, atk: 105, def: 85, moves: ['백만볼트', '하이드로펌프'] } } },
+      { id: 9, name: "10. 포켓몬 리그 성지 (최종)", minLevel: 50, maxLevel: 65, wildIds: [144, 145, 146, 150, 151], gymLeader: { name: "전설의 마스터 레드", badgeName: "마스터 뱃지", pokemon: { name: "뮤츠", id: 150, level: 66, hp: 450, maxHp: 450, atk: 140, def: 110, moves: ['사이코키네시스', '백만볼트', '화염방사'] } } }
+    ];
+
+    const SHOP_ITEMS = [
+      { id: 'poke_ball', name: '몬스터볼', price: 200, desc: '야생 포켓몬을 잡기 위한 일반 볼', catchRate: 1.0, type: 'ball', icon: 'fa-bowling-ball', color: 'text-red-500' },
+      { id: 'great_ball', name: '수퍼볼', price: 600, desc: '몬스터볼보다 잡기 쉬운 고급 볼', catchRate: 1.8, type: 'circle-dot', color: 'text-blue-500' },
+      { id: 'ultra_ball', name: '하이퍼볼', price: 1200, desc: '아주 뛰어난 포획률을 자랑하는 볼', catchRate: 2.5, type: 'stop-circle', color: 'text-amber-500' },
+      { id: 'master_ball', name: '마스터볼', price: 5000, desc: '어떤 포켓몬이든 100% 무조건 포획', catchRate: 255, type: 'compact-disc', color: 'text-purple-500' },
+      { id: 'potion', name: '상처약', price: 200, desc: '포켓몬의 HP를 30 회복합니다.', heal: 30, type: 'heal', icon: 'fa-notes-medical', color: 'text-emerald-500' },
+      { id: 'pokemon_egg', name: '포켓몬 알', price: 1000, desc: '탐험을 하다보면 부화하는 신비로운 알!', type: 'egg', icon: 'fa-egg', color: 'text-pink-400' }
+    ];
+
+    class RetroAudio {
+      constructor() { this.ctx = null; }
+      init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+      playTone(freq, duration, type = 'square', gainVal = 0.08) {
+        try {
+          this.init();
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type; osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.start(); osc.stop(this.ctx.currentTime + duration);
+        } catch(e) {}
+      }
+      playHit() { this.playTone(140, 0.12, 'sawtooth', 0.15); }
+      playFanfare() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => this.playTone(f, 0.2, 'triangle', 0.1), i * 100)); }
+      playClick() { this.playTone(440, 0.04, 'square', 0.04); }
+      playShiny() { [880, 1174, 1760].forEach((f, i) => setTimeout(() => this.playTone(f, 0.15, 'sine', 0.15), i * 100)); }
+      playHatch() { [300, 400, 500, 600, 800].forEach((f, i) => setTimeout(() => this.playTone(f, 0.2, 'triangle', 0.15), i * 120)); }
+    }
+    const soundEffect = new RetroAudio();
+
+    let currentUser = "";
+    let gameState = {
+      gold: 1000,
+      currentRegionId: 0,
+      badges: [],
+      inventory: { 'poke_ball': 10, 'great_ball': 2, 'potion': 5, 'pokemon_egg': 0 },
+      party: [],
+      pokedex: {},
+      eggSteps: 0,
+      currentBattle: null,
+      inBattle: false,
+      isTrainerBattle: false
+    };
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      const container = canvas.parentElement;
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+      renderCurrentScene();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function handleLogin() {
+      const usernameInput = document.getElementById('login-username').value.trim();
+      if (!usernameInput) {
+        alert("트레이너 이름을 입력해주세요!");
+        return;
+      }
+      currentUser = usernameInput;
+      document.getElementById('header-username').innerText = `트레이너: ${currentUser}`;
+      soundEffect.playClick();
+      document.getElementById('screen-login').classList.add('hidden');
+
+      loadGameForUser();
+    }
+
+    function createPokemon(speciesData, level = 3, isShiny = false) {
+      const maxHp = Math.floor(speciesData.hp + (level * 3));
+      const atk = Math.floor(speciesData.atk + (level * 1.8));
+      const def = Math.floor(speciesData.def + (level * 1.5));
+      const moves = speciesData.moves.map(m => MOVES_DB[m] || MOVES_DB['몸통박치기']);
+
+      return {
+        id: speciesData.id,
+        name: (isShiny ? '✨이로치 ' : '') + speciesData.name,
+        rawName: speciesData.name,
+        type: speciesData.type,
+        level: level,
+        hp: maxHp,
+        maxHp: maxHp,
+        atk: atk,
+        def: def,
+        exp: 0,
+        maxExp: level * 15,
+        expYield: speciesData.expYield,
+        moves: moves,
+        isShiny: isShiny,
+        spriteFront: isShiny ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${speciesData.id}.png` : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${speciesData.id}.png`,
+        spriteBack: isShiny ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/shiny/${speciesData.id}.png` : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/${speciesData.id}.png`,
+        artwork: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${speciesData.id}.png`
+      };
+    }
+
+    function loadGameForUser() {
+      const saved = localStorage.getItem(`pokemon_user_${currentUser}`);
+      if (saved) {
+        try {
+          gameState = JSON.parse(saved);
+          document.getElementById('screen-starter').classList.add('hidden');
+          updateHeaderUI();
+          resizeCanvas();
+          showDialogue(`환영합니다, ${currentUser} 트레이너님! 데이터를 불러왔습니다.`);
+          return;
+        } catch(e) {}
+      }
+      // 새 계정인 경우 도감 초기화 및 스타터 선택 화면 노출
+      POKEMON_DB.forEach(p => { gameState.pokedex[p.id] = { seen: false, caught: false }; });
+      updateHeaderUI();
+      resizeCanvas();
+      document.getElementById('screen-starter').classList.remove('hidden');
+    }
+
+    function selectStarter(name) {
+      soundEffect.playClick();
+      const base = POKEMON_DB.find(p => p.name === name);
+      const starter = createPokemon(base, 3, false);
+      gameState.party.push(starter);
+      gameState.pokedex[starter.id] = { seen: true, caught: true };
+
+      document.getElementById('screen-starter').classList.add('hidden');
+      updateHeaderUI();
+      showDialogue(`파트너 ${starter.name}과(와) 함께 모험을 시작합니다!`);
+      saveGame();
+      renderCurrentScene();
+    }
+
+    function updateHeaderUI() {
+      const region = REGIONS[gameState.currentRegionId];
+      document.getElementById('header-area-name').innerText = region.name;
+      document.getElementById('gold-val').innerText = gameState.gold;
+      const balls = Object.keys(gameState.inventory).filter(k => k.includes('ball')).reduce((sum, k) => sum + gameState.inventory[k], 0);
+      document.getElementById('balls-val').innerText = balls;
+      document.getElementById('badge-val').innerText = gameState.badges.length;
+    }
+
+    function showDialogue(text, autoHide = true, callback = null) {
+      const box = document.getElementById('battle-dialogue');
+      box.classList.remove('opacity-0');
+      document.getElementById('dialogue-text').innerText = text;
+      if (autoHide) {
+        setTimeout(() => {
+          box.classList.add('opacity-0');
+          if (callback) callback();
+        }, 2200);
+      }
+    }
+
+    /* Canvas Renderers */
+    function getLoadedImage(src) {
+      if (!window.loadedImages) window.loadedImages = {};
+      if (!window.loadedImages[src]) {
+        const img = new Image(); img.src = src; window.loadedImages[src] = img;
+      }
+      return window.loadedImages[src];
+    }
+
+    function renderCurrentScene() {
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (gameState.inBattle && gameState.currentBattle) {
+        renderBattleScene();
+      } else {
+        renderHubScene();
+      }
+    }
+
+    function renderHubScene() {
+      const w = canvas.width, h = canvas.height;
+      const sky = ctx.createLinearGradient(0, 0, 0, h * 0.6);
+      sky.addColorStop(0, '#0284c7'); sky.addColorStop(1, '#7dd3fc');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h * 0.6);
+
+      const ground = ctx.createLinearGradient(0, h * 0.6, 0, h);
+      ground.addColorStop(0, '#16a34a'); ground.addColorStop(1, '#14532d');
+      ctx.fillStyle = ground; ctx.fillRect(0, h * 0.6, w, h * 0.4);
+
+      if (gameState.party.length > 0) {
+        const lead = gameState.party[0];
+        const img = getLoadedImage(lead.artwork || lead.spriteFront);
+        const size = Math.min(w, h) * 0.38;
+        const px = w / 2 - size / 2, py = h * 0.5 - size / 2;
+
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath(); ctx.ellipse(w / 2, py + size * 0.88, size * 0.3, 10, 0, 0, Math.PI * 2); ctx.fill();
+
+        if (img.complete) ctx.drawImage(img, px, py, size, size);
+        else img.onload = () => renderHubScene();
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.fillRect(w / 2 - 110, py + size + 8, 220, 32);
+        ctx.strokeStyle = '#334155'; ctx.strokeRect(w / 2 - 110, py + size + 8, 220, 32);
+
+        ctx.font = 'bold 13px "Noto Sans KR", sans-serif'; ctx.fillStyle = '#fde047'; ctx.textAlign = 'center';
+        ctx.fillText(`[선두] ${lead.name} (Lv.${lead.level})`, w / 2, py + size + 29);
+      }
+    }
+
+    function renderBattleScene() {
+      const b = gameState.currentBattle; if (!b) return;
+      const w = canvas.width, h = canvas.height;
+
+      ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, w, h);
+      const enemySky = ctx.createLinearGradient(0, 0, 0, h * 0.5);
+      enemySky.addColorStop(0, '#1e293b'); enemySky.addColorStop(1, '#334155');
+      ctx.fillStyle = enemySky; ctx.fillRect(0, 0, w, h * 0.5);
+
+      ctx.fillStyle = '#475569'; ctx.beginPath(); ctx.ellipse(w * 0.75, h * 0.42, w * 0.22, 22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.ellipse(w * 0.25, h * 0.78, w * 0.28, 28, 0, 0, Math.PI * 2); ctx.fill();
+
+      // Enemy Sprite
+      if (!b.isBallCaptured) {
+        const enemyImg = getLoadedImage(b.enemy.spriteFront);
+        if (enemyImg.complete) {
+          const size = Math.min(w, h) * 0.32;
+          ctx.drawImage(enemyImg, w * 0.75 - size / 2 + (b.enemyAnimX || 0), h * 0.42 - size * 0.8, size, size);
+        } else { enemyImg.onload = () => renderBattleScene(); }
+      }
+
+      // Player Sprite
+      if (!b.isBallThrowing) {
+        const pImg = getLoadedImage(b.player.spriteBack);
+        if (pImg.complete) {
+          const size = Math.min(w, h) * 0.38;
+          ctx.drawImage(pImg, w * 0.25 - size / 2 + (b.playerAnimX || 0), h * 0.78 - size * 0.85, size, size);
+        } else { pImg.onload = () => renderBattleScene(); }
+      }
+
+      // Ball Animation
+      if (b.ballAnim) {
+        ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(b.ballAnim.x, b.ballAnim.y, 10, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(b.ballAnim.x, b.ballAnim.y + 2, 10, 0, Math.PI); ctx.fill();
+      }
+
+      renderBattleHUD();
+    }
+
+    function renderBattleHUD() {
+      const b = gameState.currentBattle; const w = canvas.width, h = canvas.height;
+      
+      // Enemy HUD
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.95)'; ctx.fillRect(20, 20, 230, 68);
+      ctx.strokeStyle = '#475569'; ctx.lineWidth = 2; ctx.strokeRect(20, 20, 230, 68);
+
+      ctx.font = 'bold 13px "Noto Sans KR", sans-serif'; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left';
+      ctx.fillText(`${b.enemy.name}`, 30, 42);
+      ctx.fillStyle = '#fde047'; ctx.fillText(`Lv.${b.enemy.level}`, 185, 42);
+      
+      const eRatio = Math.max(0, b.enemy.hp / b.enemy.maxHp);
+      ctx.fillStyle = '#334155'; ctx.fillRect(30, 50, 190, 10);
+      ctx.fillStyle = eRatio > 0.5 ? '#22c55e' : eRatio > 0.2 ? '#eab308' : '#ef4444';
+      ctx.fillRect(30, 50, 190 * eRatio, 10);
+
+      ctx.font = 'bold 11px "Noto Sans KR", sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.textAlign = 'right';
+      ctx.fillText(`HP: ${b.enemy.hp} / ${b.enemy.maxHp}`, 220, 78);
+
+      // Player HUD
+      const px = w - 240, py = h * 0.55;
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.95)'; ctx.fillRect(px, py, 220, 75);
+      ctx.strokeStyle = '#475569'; ctx.strokeRect(px, py, 220, 75);
+
+      ctx.font = 'bold 13px "Noto Sans KR", sans-serif'; ctx.fillStyle = '#ffffff'; ctx.textAlign = 'left';
+      ctx.fillText(`${b.player.name}`, px + 12, py + 22);
+      ctx.fillStyle = '#fde047'; ctx.fillText(`Lv.${b.player.level}`, px + 170, py + 22);
+
+      const pRatio = Math.max(0, b.player.hp / b.player.maxHp);
+      ctx.fillStyle = '#334155'; ctx.fillRect(px + 12, py + 32, 195, 10);
+      ctx.fillStyle = pRatio > 0.5 ? '#22c55e' : pRatio > 0.2 ? '#eab308' : '#ef4444';
+      ctx.fillRect(px + 12, py + 32, 195 * pRatio, 10);
+
+      ctx.font = 'bold 11px "Noto Sans KR", sans-serif'; ctx.fillStyle = '#cbd5e1'; ctx.textAlign = 'right';
+      ctx.fillText(`HP: ${b.player.hp} / ${b.player.maxHp}`, px + 207, py + 62);
+    }
+
+    /* Exploration & Catching Mechanics */
+    const TRAINER_NAMES = ["엘리트 트레이너 민수", "포켓몬 매니아 지훈", "반바지 꼬마 준호", "유치원생 영희", "로켓단 조무래기"];
+
+    function exploreGrass() {
+      soundEffect.playClick();
+      const alive = gameState.party.find(p => p.hp > 0);
+      if (!alive) { showDialogue("모든 포켓몬이 기절했습니다! 포켓몬 센터로 가세요."); return; }
+
+      if ((gameState.inventory['pokemon_egg'] || 0) > 0) {
+        gameState.eggSteps++;
+        if (gameState.eggSteps >= 5) {
+          gameState.inventory['pokemon_egg']--;
+          gameState.eggSteps = 0;
+          const randomBase = POKEMON_DB[Math.floor(Math.random() * POKEMON_DB.length)];
+          const hatched = createPokemon(randomBase, 3, false);
+          if (gameState.party.length < 6) gameState.party.push(hatched);
+          soundEffect.playHatch();
+          alert(`🥚 알에서 귀여운 [${hatched.name}]이(가) 부화했습니다! 파티에 합류합니다.`);
+        }
+      }
+
+      const region = REGIONS[gameState.currentRegionId];
+
+      if (Math.random() < 0.25) {
+        const trainerName = TRAINER_NAMES[Math.floor(Math.random() * TRAINER_NAMES.length)];
+        const wildId = region.wildIds[Math.floor(Math.random() * region.wildIds.length)];
+        const base = POKEMON_DB.find(p => p.id === wildId);
+        const level = Math.floor(Math.random() * (region.maxLevel - region.minLevel + 1)) + region.minLevel;
+        const enemyPoke = createPokemon(base, level, false);
+        enemyPoke.name = `${trainerName}의 ${enemyPoke.rawName}`;
+
+        startBattle(alive, enemyPoke, false, true);
+        showDialogue(`⚔️ 트레이너 ${trainerName}와(과)의 배틀이 시작되었다!`);
+      } else {
+        const wildId = region.wildIds[Math.floor(Math.random() * region.wildIds.length)];
+        const base = POKEMON_DB.find(p => p.id === wildId);
+        const level = Math.floor(Math.random() * (region.maxLevel - region.minLevel + 1)) + region.minLevel;
+        
+        const isShiny = Math.random() < 0.05;
+        const wild = createPokemon(base, level, isShiny);
+        if (isShiny) soundEffect.playShiny();
+
+        if (!gameState.pokedex[wild.id]) gameState.pokedex[wild.id] = { seen: true, caught: false };
+        else gameState.pokedex[wild.id].seen = true;
+
+        startBattle(alive, wild, false, false);
+        if (isShiny) showDialogue(`✨ 반짝이는 이로치 ${wild.rawName}(이)가 나타났다!`);
+        else showDialogue(`야생의 ${wild.name}(이)가 나타났다!`);
+      }
+    }
+
+    function challengeGym() {
+      soundEffect.playClick();
+      const alive = gameState.party.find(p => p.hp > 0);
+      if (!alive) { showDialogue("사용 가능한 포켓몬이 없습니다!"); return; }
+
+      const region = REGIONS[gameState.currentRegionId];
+      const leader = region.gymLeader;
+      
+      if (gameState.badges.includes(leader.badgeName)) {
+        showDialogue(`이미 [${region.name}] 체육관 관장을 격파했습니다!`);
+        return;
+      }
+
+      const gymPoke = createPokemon(POKEMON_DB.find(p => p.id === leader.pokemon.id), leader.pokemon.level, false);
+      gymPoke.name = leader.pokemon.name;
+      gymPoke.hp = leader.pokemon.hp; gymPoke.maxHp = leader.pokemon.maxHp;
+      gymPoke.atk = leader.pokemon.atk; gymPoke.def = leader.pokemon.def;
+
+      startBattle(alive, gymPoke, true, false);
+      showDialogue(`🏟️ ${leader.name}과의 체육관 배틀 시작!`);
+    }
+
+    function startBattle(playerPoke, enemyPoke, isGym, isTrainer) {
+      gameState.inBattle = true;
+      gameState.currentBattle = {
+        player: playerPoke, enemy: enemyPoke, isGym: isGym, isTrainer: isTrainer, turn: 'player', isAnimating: false
+      };
+      document.getElementById('hub-controls').classList.add('hidden');
+      document.getElementById('battle-controls').classList.remove('hidden');
+      updateHeaderUI();
+      renderCurrentScene();
+    }
+
+    function openMoveMenu() {
+      soundEffect.playClick();
+      const b = gameState.currentBattle;
+      if (!b || b.turn !== 'player' || b.isAnimating) return;
+
+      const container = document.getElementById('move-controls');
+      container.innerHTML = '';
+      b.player.moves.forEach(m => {
+        const btn = document.createElement('button');
+        btn.className = 'bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl p-2.5 flex flex-col items-start transition';
+        btn.onclick = () => executePlayerMove(m);
+        btn.innerHTML = `<span class="font-bold text-sm text-slate-100">${m.name}</span><span class="text-xs text-amber-400">위력: ${m.power}</span>`;
+        container.appendChild(btn);
+      });
+      document.getElementById('battle-controls').classList.add('hidden');
+      container.classList.remove('hidden');
+    }
+
+    function executePlayerMove(move) {
+      document.getElementById('move-controls').classList.add('hidden');
+      document.getElementById('battle-controls').classList.remove('hidden');
+
+      const b = gameState.currentBattle;
+      b.isAnimating = true;
+      b.playerAnimX = 15;
+      renderCurrentScene();
+
+      setTimeout(() => {
+        b.playerAnimX = 0;
+        soundEffect.playHit();
+
+        const dmg = Math.max(3, Math.floor((move.power * (b.player.atk / b.enemy.def)) * 0.8));
+        b.enemy.hp = Math.max(0, b.enemy.hp - dmg);
+
+        showDialogue(`${b.player.name}의 ${move.name}! ${dmg} 데미지!`, true, () => {
+          renderCurrentScene();
+          if (b.enemy.hp <= 0) {
+            handleVictory();
+          } else {
+            b.turn = 'enemy';
+            setTimeout(executeEnemyMove, 900);
+          }
+        });
+      }, 250);
+    }
+
+    function executeEnemyMove() {
+      const b = gameState.currentBattle;
+      if (!b || b.enemy.hp <= 0) return;
+
+      const move = b.enemy.moves[Math.floor(Math.random() * b.enemy.moves.length)];
+      b.enemyAnimX = -15;
+      renderCurrentScene();
+
+      setTimeout(() => {
+        b.enemyAnimX = 0;
+        soundEffect.playHit();
+
+        const dmg = Math.max(2, Math.floor((move.power * (b.enemy.atk / b.player.def)) * 0.7));
+        b.player.hp = Math.max(0, b.player.hp - dmg);
+
+        showDialogue(`${b.enemy.name}의 ${move.name}! ${dmg} 데미지!`, true, () => {
+          renderCurrentScene();
+          if (b.player.hp <= 0) {
+            showDialogue(`${b.player.name}이(가) 쓰러졌습니다!`);
+            setTimeout(() => {
+              const next = gameState.party.find(p => p.hp > 0);
+              if (next) openPartyMenu(true);
+              else { showDialogue("포켓몬 센터로 강제 이송됩니다."); setTimeout(endBattleAndHeal, 2000); }
+            }, 1000);
+          } else {
+            b.turn = 'player';
+            b.isAnimating = false;
+          }
+        });
+      }, 250);
+    }
+
+    function attemptCatch(ballId) {
+      closeModal('modal-bag');
+      const b = gameState.currentBattle;
+      if (!b || b.isGym || b.isTrainer || b.isAnimating) {
+        alert("트레이너전이나 체육관에서는 몬스터볼을 사용할 수 없습니다!");
+        return;
+      }
+
+      if ((gameState.inventory[ballId] || 0) <= 0) {
+        alert("몬스터볼이 부족합니다!");
+        return;
+      }
+
+      gameState.inventory[ballId]--;
+      updateHeaderUI();
+
+      b.isAnimating = true;
+      b.isBallThrowing = true;
+
+      const ballData = SHOP_ITEMS.find(i => i.id === ballId);
+      const catchRate = ballData ? ballData.catchRate : 1.0;
+
+      let startX = canvas.width * 0.25, startY = canvas.height * 0.78;
+      let targetX = canvas.width * 0.75, targetY = canvas.height * 0.42;
+      let progress = 0;
+
+      const throwInterval = setInterval(() => {
+        progress += 0.08;
+        const curX = startX + (targetX - startX) * progress;
+        const curY = startY + (targetY - startY) * progress - Math.sin(progress * Math.PI) * 100;
+        b.ballAnim = { x: curX, y: curY };
+        renderCurrentScene();
+
+        if (progress >= 1) {
+          clearInterval(throwInterval);
+          b.ballAnim = null;
+          b.isBallThrowing = false;
+          b.isBallCaptured = true;
+          renderCurrentScene();
+
+          const hpRatio = b.enemy.hp / b.enemy.maxHp;
+          const successChance = (1 - hpRatio * 0.6) * (catchRate * 0.45);
+          const isSuccess = catchRate >= 255 || Math.random() < successChance;
+
+          setTimeout(() => {
+            if (isSuccess) {
+              soundEffect.playFanfare();
+              showDialogue(`🎉 축하합니다! ${b.enemy.name}을(를) 잡았습니다!`);
+              
+              const caughtPoke = createPokemon(POKEMON_DB.find(p => p.name === b.enemy.rawName || p.id === b.enemy.id), b.enemy.level, b.enemy.isShiny);
+              caughtPoke.hp = b.enemy.hp;
+              gameState.pokedex[caughtPoke.id] = { seen: true, caught: true };
+
+              if (gameState.party.length < 6) {
+                gameState.party.push(caughtPoke);
+              } else {
+                alert("파티가 가득 차서 박스로 전송되었습니다!");
+              }
+
+              setTimeout(endBattle, 1800);
+            } else {
+              soundEffect.playHit();
+              showDialogue("아깝다! 포켓몬이 볼에서 튀어나왔다!");
+              b.isBallCaptured = false;
+              renderCurrentScene();
+              b.turn = 'enemy';
+              setTimeout(executeEnemyMove, 1000);
+            }
+          }, 1000);
+        }
+      }, 30);
+    }
+
+    function handleVictory() {
+      const b = gameState.currentBattle;
+      if (b.isGym) {
+        const region = REGIONS[gameState.currentRegionId];
+        const leader = region.gymLeader;
+        if (!gameState.badges.includes(leader.badgeName)) gameState.badges.push(leader.badgeName);
+        soundEffect.playFanfare();
+        showDialogue(`🏆 관장을 쓰러뜨리고 [${leader.badgeName}] 획득!`);
+      } else if (b.isTrainer) {
+        const goldGain = b.enemy.level * 60;
+        const expGain = b.enemy.level * 15;
+        gameState.gold += goldGain;
+        b.player.exp += expGain;
+        soundEffect.playFanfare();
+        showDialogue(`트레이너 승리! 상금 +${goldGain}G, EXP +${expGain}`);
+      } else {
+        const expGain = b.enemy.level * 10;
+        const goldGain = b.enemy.level * 30;
+        gameState.gold += goldGain;
+        b.player.exp += expGain;
+
+        if (b.player.exp >= b.player.maxExp) {
+          b.player.level++;
+          b.player.maxHp += 6;
+          b.player.hp = b.player.maxHp;
+          b.player.atk += 3;
+          b.player.def += 3;
+          b.player.exp = 0;
+          b.player.maxExp = b.player.level * 15;
+          showDialogue(`✨ 레벨 업! 레벨 ${b.player.level} 달성!`);
+        } else {
+          soundEffect.playFanfare();
+          showDialogue(`승리! EXP +${expGain}, 골드 +${goldGain}G`);
+        }
+      }
+      setTimeout(endBattle, 1800);
+    }
+
+    function attemptRun() {
+      soundEffect.playClick();
+      const b = gameState.currentBattle;
+      if (b.isGym || b.isTrainer) { alert("체육관이나 트레이너전에서는 도망칠 수 없습니다!"); return; }
+      showDialogue("무사히 도망쳤다!");
+      setTimeout(endBattle, 1000);
+    }
+
+    function endBattle() {
+      gameState.inBattle = false;
+      gameState.currentBattle = null;
+      document.getElementById('battle-controls').classList.add('hidden');
+      document.getElementById('move-controls').classList.add('hidden');
+      document.getElementById('hub-controls').classList.remove('hidden');
+      updateHeaderUI(); saveGame(); renderCurrentScene();
+    }
+
+    function endBattleAndHeal() { endBattle(); visitCenter(); }
+
+    /* Area & Utilities */
+    function openAreaModal() {
+      soundEffect.playClick();
+      const list = document.getElementById('area-list');
+      list.innerHTML = '';
+      REGIONS.forEach((reg, idx) => {
+        const row = document.createElement('div');
+        row.className = `bg-slate-900 border ${gameState.currentRegionId === idx ? 'border-indigo-500' : 'border-slate-800'} rounded-xl p-3 flex justify-between items-center`;
+        row.innerHTML = `
+          <div>
+            <div class="font-bold text-slate-100">${reg.name} <span class="text-xs text-indigo-400">(권장 Lv.${reg.minLevel}~${reg.maxLevel})</span></div>
+            <div class="text-xs text-slate-400">보스: ${reg.gymLeader.name}</div>
+          </div>
+          ${gameState.currentRegionId !== idx ? `<button onclick="travelToArea(${idx})" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-3 rounded-lg">이동</button>` : '<span class="text-xs text-indigo-400 font-bold">현재 위치</span>'}
+        `;
+        list.appendChild(row);
+      });
+      openModal('modal-area');
+    }
+
+    function travelToArea(idx) {
+      soundEffect.playClick();
+      gameState.currentRegionId = idx;
+      closeModal('modal-area');
+      updateHeaderUI();
+      showDialogue(`📍 [${REGIONS[idx].name}] (으)로 이동했습니다!`);
+      renderCurrentScene();
+      saveGame();
+    }
+
+    function visitCenter() {
+      soundEffect.playClick();
+      gameState.party.forEach(p => p.hp = p.maxHp);
+      soundEffect.playFanfare();
+      showDialogue("포켓몬 센터: 모든 포켓몬의 체력이 완벽하게 회복되었습니다!");
+      renderCurrentScene(); saveGame();
+    }
+
+    function visitShop() {
+      soundEffect.playClick();
+      const container = document.getElementById('shop-items');
+      container.innerHTML = '';
+      SHOP_ITEMS.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'bg-slate-900 border border-slate-800 rounded-xl p-3 flex justify-between items-center';
+        row.innerHTML = `
+          <div class="flex items-center gap-3">
+            <i class="fa-solid ${item.icon} text-2xl ${item.color}"></i>
+            <div><div class="font-bold text-slate-100">${item.name}</div><div class="text-xs text-slate-400">${item.desc}</div></div>
+          </div>
+          <button onclick="buyItem('${item.id}')" class="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs py-2 px-3 rounded-lg">${item.price}G 구매</button>
+        `;
+        container.appendChild(row);
+      });
+      openModal('modal-shop');
+    }
+
+    function buyItem(id) {
+      const item = SHOP_ITEMS.find(i => i.id === id);
+      if (gameState.gold < item.price) { alert("골드가 부족합니다!"); return; }
+      gameState.gold -= item.price;
+      gameState.inventory[id] = (gameState.inventory[id] || 0) + 1;
+      soundEffect.playClick(); updateHeaderUI(); saveGame();
+    }
+
+    function openPartyMenu(isSwitch) {
+      soundEffect.playClick();
+      const list = document.getElementById('party-list');
+      list.innerHTML = '';
+      document.getElementById('party-count').innerText = gameState.party.length;
+
+      gameState.party.forEach((poke, idx) => {
+        const row = document.createElement('div');
+        row.className = `bg-slate-900 border ${idx === 0 ? 'border-amber-500' : 'border-slate-800'} rounded-xl p-3 flex justify-between items-center`;
+        row.innerHTML = `
+          <div class="flex items-center gap-3">
+            <img src="${poke.spriteFront}" class="w-12 h-12 object-contain" />
+            <div>
+              <div class="font-bold text-slate-100">${poke.name} <span class="text-xs text-amber-400">Lv.${poke.level}</span></div>
+              <div class="text-[10px] text-slate-400">HP: ${poke.hp} / ${poke.maxHp}</div>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            ${idx > 0 ? `<button onclick="setLead(${idx})" class="text-xs bg-slate-800 text-slate-200 px-2 py-1 rounded">선두</button>` : ''}
+            ${isSwitch && idx !== 0 && poke.hp > 0 ? `<button onclick="switchPoke(${idx})" class="text-xs bg-emerald-600 text-white px-2 py-1 rounded">교체</button>` : ''}
+          </div>
+        `;
+        list.appendChild(row);
+      });
+      openModal('modal-party');
+    }
+
+    function setLead(idx) {
+      const p = gameState.party.splice(idx, 1)[0];
+      gameState.party.unshift(p);
+      openPartyMenu(false); renderCurrentScene(); saveGame();
+    }
+
+    function switchPoke(idx) {
+      setLead(idx); closeModal('modal-party');
+      const b = gameState.currentBattle;
+      if (b) { b.player = gameState.party[0]; showDialogue(`${b.player.name}(으)로 교체!`); b.turn = 'enemy'; setTimeout(executeEnemyMove, 900); }
+    }
+
+    function openPokedex() {
+      soundEffect.playClick();
+      const grid = document.getElementById('pokedex-grid');
+      grid.innerHTML = '';
+      POKEMON_DB.forEach(p => {
+        const st = gameState.pokedex[p.id] || { seen: false, caught: false };
+        const card = document.createElement('div');
+        card.className = `p-3 rounded-xl border flex flex-col items-center justify-center text-center ${st.caught ? 'bg-slate-900 border-emerald-500/50' : 'bg-slate-950 border-slate-800'}`;
+        card.innerHTML = st.seen ? `
+          <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png" class="w-16 h-16 object-contain ${!st.caught ? 'brightness-0 opacity-40' : ''}" />
+          <span class="text-xs font-bold text-slate-300 mt-1">${st.caught ? p.name : '???'}</span>
+        ` : `<div class="w-16 h-16 flex items-center justify-center text-slate-700 text-xl font-bold">?</div><span class="text-xs font-bold text-slate-600 mt-1">???</span>`;
+        grid.appendChild(card);
+      });
+      openModal('modal-pokedex');
+    }
+
+    function openBagMenu() {
+      soundEffect.playClick();
+      const list = document.getElementById('bag-items-list');
+      list.innerHTML = '';
+      
+      const itemNames = { 'poke_ball': '몬스터볼', 'great_ball': '수퍼볼', 'ultra_ball': '하이퍼볼', 'master_ball': '마스터볼', 'potion': '상처약', 'pokemon_egg': '포켓몬 알' };
+
+      Object.keys(gameState.inventory).forEach(id => {
+        const cnt = gameState.inventory[id];
+        if (cnt > 0) {
+          const row = document.createElement('div');
+          row.className = 'bg-slate-900 border border-slate-800 rounded-xl p-3 flex justify-between items-center';
+          row.innerHTML = `
+            <div class="flex items-center gap-3">
+              <div><div class="font-bold text-slate-100">${itemNames[id] || id} <span class="text-xs text-amber-400">x${cnt}</span></div></div>
+            </div>
+            ${id.includes('ball') ? `<button onclick="attemptCatch('${id}')" class="bg-red-600 hover:bg-red-500 text-white font-bold text-xs py-2 px-3 rounded-lg">던지기</button>` : ''}
+            ${id === 'potion' ? `<button onclick="useBagItem('${id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-2 px-3 rounded-lg">사용</button>` : ''}
+          `;
+          list.appendChild(row);
+        }
+      });
+      openModal('modal-bag');
+    }
+
+    function useBagItem(id) {
+      if (id === 'potion') {
+        const lead = gameState.party[0];
+        if (lead.hp >= lead.maxHp) { alert("이미 체력이 가득 찼습니다."); return; }
+        gameState.inventory[id]--;
+        lead.hp = Math.min(lead.maxHp, lead.hp + 30);
+        soundEffect.playFanfare();
+        closeModal('modal-bag'); showDialogue(`${lead.name}의 체력 30 회복!`);
+        updateHeaderUI(); renderCurrentScene(); saveGame();
+      }
+    }
+
+    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { soundEffect.playClick(); document.getElementById(id).classList.add('hidden'); }
+    function saveGame() { 
+      if (currentUser) {
+        localStorage.setItem(`pokemon_user_${currentUser}`, JSON.stringify(gameState)); 
+      }
+    }
+    function saveGamePrompt() { soundEffect.playClick(); saveGame(); showDialogue("게임이 안전하게 저장되었습니다!"); }
+  </script>
+</body>
+</html>
